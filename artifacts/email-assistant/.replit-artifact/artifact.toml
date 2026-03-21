@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Email Assistant Dashboard"
+version = "1.0.0"
+id = "artifacts/email-assistant"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23794
+
+[services.development]
+run = "pnpm --filter @workspace/email-assistant run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/email-assistant", "run", "build" ]
+publicDir = "artifacts/email-assistant/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23794"
+BASE_PATH = "/"

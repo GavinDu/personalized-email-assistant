@@ -1,0 +1,19 @@
+packages:
+  "framer-motion": "For page transitions, list animations, and smooth UI interactions."
+  "recharts": "Required for the Analytics dashboard to render reward trends and distributions."
+  "date-fns": "For beautiful date formatting in the Inbox and Analytics."
+  "clsx": "Utility for constructing className strings conditionally."
+  "tailwind-merge": "Utility to merge tailwind classes safely."
+
+images:
+  - path: "artifacts/email-assistant/public/images/logo.png"
+    description: "A minimal, modern geometric logo for an AI email assistant. Deep indigo and neon blue accents on a transparent background."
+    aspect_ratio: "1:1"
+  - path: "artifacts/email-assistant/public/images/empty-inbox.png"
+    description: "A beautiful, premium 3D illustration of a clean, empty futuristic mailbox or floating envelope in a dark mode setting. Neon glowing accents."
+    aspect_ratio: "1:1"
+
+notes:
+  - The Python FastAPI backend runs at `/pyapi`.
+  - All React Query hooks use `/pyapi` as the base URL.
+  - Using a dark-mode professional aesthetic natively via CSS variables.
