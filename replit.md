@@ -15,7 +15,7 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **Database**: PostgreSQL + SQLAlchemy (Python), Drizzle ORM (TypeScript)
 - **Frontend**: React + Vite + Tailwind CSS + Framer Motion + Recharts
 - **Validation**: Zod (TS), Pydantic (Python)
-- **AI**: OpenAI gpt-5-mini via Replit AI Integrations proxy
+- **AI**: OpenAI gpt-5-mini via Replit AI Integrations proxy (draft generation); Qwen 3 14B + Gemma 3 12B via OpenRouter (RL classification)
 
 ## Email Assistant Architecture
 
@@ -45,6 +45,16 @@ The project is a personalized email assistant prototype with:
 - Edit: -0.3 reward (minus edit-distance penalty)
 - Discard: -1.0 reward
 - UCB-style bandit state computed per tone in analytics endpoint
+
+### In-Context RL Classifier (NEW)
+- **Models**: `qwen/qwen3-14b` (default) and `google/gemma-3-12b-it` — selectable via `/rl/settings` endpoint
+- **Experience Replay Buffer**: Pulls top-K high-reward (approved) and low-reward (discarded) examples from `email_logs` to build dynamic few-shot prompts
+- **In-context RL**: No weight updates — the LLM adapts via example selection. As the buffer fills with approved classifications, future classifications improve automatically
+- **Services**: `services/rl_classifier.py` (RL classification), `services/experience_buffer.py` (buffer management)
+- **New routes**: `GET/PUT /rl/settings` — get/set active model; model persists for server lifetime
+- **DB migration**: `_migrate_columns()` in `database.py` adds RL fields to `emails` table on startup
+- **RL fields on Email**: `rl_model`, `rl_model_key`, `rl_positive_examples`, `rl_negative_examples`, `rl_latency_ms`, `rl_active`
+- **Analytics**: `rl_buffer` and `rl_model_breakdown` added to `/analytics` response
 
 ### Database
 - PostgreSQL via `DATABASE_URL` environment variable

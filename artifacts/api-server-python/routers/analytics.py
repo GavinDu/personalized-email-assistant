@@ -3,7 +3,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, cast, Date
 from database import get_db
 from models import EmailLog, Email
-from schemas import AnalyticsOut, RewardTrendPoint, ToneDistributionItem, ActionBreakdownItem, BanditState, HistoryItem, ClassificationBreakdownItem
+from schemas import AnalyticsOut, RewardTrendPoint, ToneDistributionItem, ActionBreakdownItem, BanditState, HistoryItem, ClassificationBreakdownItem, RLBufferStats, RLModelBreakdownItem
+from services.experience_buffer import get_buffer_stats
+from services.rl_classifier import SUPPORTED_MODELS
 from typing import List
 import math
 
@@ -116,6 +118,32 @@ def get_analytics(db: Session = Depends(get_db)):
     avg_reward_val = db.query(func.avg(EmailLog.reward)).scalar()
     avg_reward = round(avg_reward_val, 3) if avg_reward_val is not None else 0.0
 
+    # RL buffer stats
+    buffer_stats_raw = get_buffer_stats(db)
+    rl_buffer = RLBufferStats(**buffer_stats_raw)
+
+    # Per-model breakdown from emails table
+    rl_rows = (
+        db.query(
+            Email.rl_model_key,
+            Email.rl_model,
+            func.count(Email.id),
+            func.avg(Email.classification_confidence),
+        )
+        .filter(Email.rl_model_key.isnot(None))
+        .group_by(Email.rl_model_key, Email.rl_model)
+        .all()
+    )
+    rl_model_breakdown = [
+        RLModelBreakdownItem(
+            model_key=row[0] or "unknown",
+            model_id=row[1] or SUPPORTED_MODELS.get(row[0], "unknown"),
+            count=row[2],
+            avg_confidence=round(float(row[3]), 3) if row[3] else 0.0,
+        )
+        for row in rl_rows
+    ]
+
     return AnalyticsOut(
         reward_trend=reward_trend,
         tone_distribution=tone_distribution,
@@ -123,6 +151,8 @@ def get_analytics(db: Session = Depends(get_db)):
         bandit_state=bandit_state,
         priority_breakdown=priority_breakdown,
         intent_breakdown=intent_breakdown,
+        rl_buffer=rl_buffer,
+        rl_model_breakdown=rl_model_breakdown,
         total_emails_processed=total,
         avg_overall_reward=avg_reward,
     )

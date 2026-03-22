@@ -20,6 +20,14 @@ class Email(Base):
     classification_confidence = Column(Float, default=0.0)
     classification_notes = Column(Text, default="")
 
+    # RL classification metadata
+    rl_model = Column(String(100), nullable=True)
+    rl_model_key = Column(String(20), nullable=True)
+    rl_positive_examples = Column(Integer, default=0)
+    rl_negative_examples = Column(Integer, default=0)
+    rl_latency_ms = Column(Integer, nullable=True)
+    rl_active = Column(Boolean, default=False)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 

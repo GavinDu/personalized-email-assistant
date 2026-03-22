@@ -18,6 +18,14 @@ class EmailOut(BaseModel):
     recommended_action: str
     classification_confidence: float
     classification_notes: str
+
+    rl_model: Optional[str] = None
+    rl_model_key: Optional[str] = None
+    rl_positive_examples: int = 0
+    rl_negative_examples: int = 0
+    rl_latency_ms: Optional[int] = None
+    rl_active: bool = False
+
     created_at: datetime
 
 
@@ -149,6 +157,24 @@ class ClassificationBreakdownItem(BaseModel):
     percentage: float
 
 
+class RLBufferStats(BaseModel):
+    total_experiences: int
+    positive_experiences: int
+    negative_experiences: int
+    neutral_experiences: int
+    positive_ratio: float
+    avg_reward: float
+    recent_avg_reward: float
+    learning_active: bool
+
+
+class RLModelBreakdownItem(BaseModel):
+    model_key: str
+    model_id: str
+    count: int
+    avg_confidence: float
+
+
 class AnalyticsOut(BaseModel):
     reward_trend: List[RewardTrendPoint]
     tone_distribution: List[ToneDistributionItem]
@@ -156,5 +182,7 @@ class AnalyticsOut(BaseModel):
     bandit_state: List[BanditState]
     priority_breakdown: List[ClassificationBreakdownItem]
     intent_breakdown: List[ClassificationBreakdownItem]
+    rl_buffer: RLBufferStats
+    rl_model_breakdown: List[RLModelBreakdownItem]
     total_emails_processed: int
     avg_overall_reward: float

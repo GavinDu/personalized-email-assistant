@@ -160,6 +160,29 @@ export function useAnalytics() {
   });
 }
 
+// RL SETTINGS
+export function useRLSettings() {
+  return useQuery({
+    queryKey: ["/pyapi/rl/settings"],
+    queryFn: () => customFetch<{ model_key: string; model_id: string; available_models: Record<string, string> }>("/rl/settings"),
+    staleTime: 30_000,
+  });
+}
+
+export function useSetRLModel() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (model_key: string) =>
+      customFetch<{ model_key: string; model_id: string; message: string }>(
+        `/rl/settings?model_key=${encodeURIComponent(model_key)}`,
+        { method: "PUT" }
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/pyapi/rl/settings"] });
+    },
+  });
+}
+
 // HISTORY
 export function useHistory() {
   return useQuery({

@@ -2,7 +2,7 @@ import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import emails, drafts, feedback, preferences, tone_rules, analytics, seed
+from routers import emails, drafts, feedback, preferences, tone_rules, analytics, seed, rl
 from database import create_tables
 
 
@@ -34,6 +34,7 @@ app.include_router(preferences.router)
 app.include_router(tone_rules.router)
 app.include_router(analytics.router)
 app.include_router(seed.router)
+app.include_router(rl.router)
 
 
 @app.get("/healthz")

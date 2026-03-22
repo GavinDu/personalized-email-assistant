@@ -4,10 +4,20 @@ import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from "recharts";
-import { Activity, Mail, Target, Award } from "lucide-react";
+import { Activity, Mail, Target, Award, Brain, Zap, Database, TrendingUp } from "lucide-react";
 import { cn } from "@/components/layout";
 
 const COLORS = ['#4f46e5', '#c084fc', '#10b981', '#f43f5e', '#f59e0b'];
+
+const MODEL_LABELS: Record<string, string> = {
+  qwen: "Qwen 3 14B",
+  gemma: "Gemma 3 12B",
+};
+
+const MODEL_COLORS: Record<string, string> = {
+  qwen: "#4f46e5",
+  gemma: "#10b981",
+};
 
 export default function AnalyticsPage() {
   const { data, isLoading } = useAnalytics();
@@ -20,6 +30,9 @@ export default function AnalyticsPage() {
     );
   }
 
+  const buf = data.rl_buffer;
+  const rlActive = buf.learning_active;
+
   return (
     <div className="flex-1 flex flex-col p-8 max-w-7xl mx-auto w-full overflow-y-auto">
       <div className="mb-8">
@@ -27,11 +40,55 @@ export default function AnalyticsPage() {
         <p className="text-muted-foreground text-sm">Reinforcement Learning metrics and usage statistics.</p>
       </div>
 
+      {/* Top stat cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <StatCard title="Total Processed" value={data.total_emails_processed} icon={Mail} color="text-sky-400" bg="bg-sky-400/10" />
         <StatCard title="Avg Overall Reward" value={(data.avg_overall_reward > 0 ? "+" : "") + data.avg_overall_reward.toFixed(2)} icon={Award} color="text-emerald-400" bg="bg-emerald-400/10" />
-        <StatCard title="Learning Status" value="Active" icon={Activity} color="text-primary" bg="bg-primary/10" />
-        <StatCard title="Top Policy" value={data.bandit_state[0]?.tone || "N/A"} icon={Target} color="text-accent" bg="bg-accent/10" capitalize />
+        <StatCard title="RL Learning" value={rlActive ? "Active" : "Warming Up"} icon={Brain} color={rlActive ? "text-primary" : "text-yellow-400"} bg={rlActive ? "bg-primary/10" : "bg-yellow-400/10"} />
+        <StatCard title="Buffer Size" value={`${buf.positive_experiences}+ / ${buf.total_experiences}`} icon={Database} color="text-accent" bg="bg-accent/10" />
+      </div>
+
+      {/* RL Learning Engine Panel */}
+      <div className="glass-panel p-0 rounded-2xl overflow-hidden mb-6">
+        <div className="p-6 border-b border-white/5 bg-black/20 flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-display font-semibold text-white flex items-center gap-2">
+              <Brain className="w-5 h-5 text-primary" />
+              In-Context RL Engine
+            </h3>
+            <p className="text-xs text-muted-foreground mt-1">Experience replay buffer — past user feedback shapes future classifications</p>
+          </div>
+          <div className={cn(
+            "px-3 py-1 rounded-full text-xs font-semibold",
+            rlActive ? "bg-emerald-500/20 text-emerald-400" : "bg-yellow-500/20 text-yellow-400"
+          )}>
+            {rlActive ? "Learning Active" : `Need ${3 - buf.total_experiences} more feedback(s)`}
+          </div>
+        </div>
+        <div className="p-6 grid grid-cols-2 md:grid-cols-4 gap-6">
+          <BufferStat label="Positive Examples" value={buf.positive_experiences} sub="approved classifications" color="text-emerald-400" />
+          <BufferStat label="Negative Examples" value={buf.negative_experiences} sub="discarded classifications" color="text-red-400" />
+          <BufferStat label="Approval Rate" value={`${(buf.positive_ratio * 100).toFixed(0)}%`} sub="of all classified emails" color="text-sky-400" />
+          <BufferStat label="Recent Avg Reward" value={(buf.recent_avg_reward > 0 ? "+" : "") + buf.recent_avg_reward.toFixed(2)} sub="last 10 classifications" color="text-primary" />
+        </div>
+
+        {/* RL Model Breakdown */}
+        {data.rl_model_breakdown.length > 0 && (
+          <div className="px-6 pb-6 border-t border-white/5 pt-4">
+            <p className="text-xs text-muted-foreground mb-3 font-semibold uppercase tracking-wide">Model Performance</p>
+            <div className="flex flex-wrap gap-4">
+              {data.rl_model_breakdown.map(m => (
+                <div key={m.model_key} className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-3">
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: MODEL_COLORS[m.model_key] || "#888" }} />
+                  <div>
+                    <p className="text-sm font-medium text-white">{MODEL_LABELS[m.model_key] || m.model_key}</p>
+                    <p className="text-xs text-white/40">{m.count} classifications · avg confidence {(m.avg_confidence * 100).toFixed(0)}%</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -114,7 +171,7 @@ export default function AnalyticsPage() {
         <div className="glass-panel p-0 rounded-2xl overflow-hidden flex flex-col">
           <div className="p-6 border-b border-white/5 bg-black/20">
             <h3 className="text-lg font-display font-semibold text-white">Priority Distribution</h3>
-            <p className="text-xs text-muted-foreground mt-1">LLM-classified email priorities across the inbox</p>
+            <p className="text-xs text-muted-foreground mt-1">RL-classified email priorities across the inbox</p>
           </div>
           <div className="p-6 flex flex-col gap-3">
             {data.priority_breakdown.map(item => (
@@ -132,7 +189,7 @@ export default function AnalyticsPage() {
         <div className="glass-panel p-0 rounded-2xl overflow-hidden flex flex-col">
           <div className="p-6 border-b border-white/5 bg-black/20">
             <h3 className="text-lg font-display font-semibold text-white">Intent Distribution</h3>
-            <p className="text-xs text-muted-foreground mt-1">LLM-classified email intents across the inbox</p>
+            <p className="text-xs text-muted-foreground mt-1">RL-classified email intents across the inbox</p>
           </div>
           <div className="p-6 flex flex-col gap-3">
             {data.intent_breakdown.map((item, i) => (
@@ -203,6 +260,23 @@ function StatCard({ title, value, icon: Icon, color, bg, capitalize }: StatCardP
         <p className="text-sm font-medium text-white/60 mb-1">{title}</p>
         <p className={cn("text-2xl font-display font-bold text-white", capitalize && "capitalize")}>{value}</p>
       </div>
+    </div>
+  );
+}
+
+interface BufferStatProps {
+  label: string;
+  value: string | number;
+  sub: string;
+  color: string;
+}
+
+function BufferStat({ label, value, sub, color }: BufferStatProps) {
+  return (
+    <div>
+      <p className="text-xs text-white/50 mb-1">{label}</p>
+      <p className={cn("text-2xl font-display font-bold", color)}>{value}</p>
+      <p className="text-xs text-white/30 mt-1">{sub}</p>
     </div>
   );
 }

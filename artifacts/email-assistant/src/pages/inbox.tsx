@@ -1,19 +1,27 @@
 import React, { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
-import { useEmails, useEmail, useGenerateDraft, useSubmitFeedback, useSeedData, type Email, type DraftOut, type SimilarEmail } from "@/hooks/use-api";
+import { useEmails, useEmail, useGenerateDraft, useSubmitFeedback, useSeedData, useRLSettings, useSetRLModel, type Email, type DraftOut, type SimilarEmail } from "@/hooks/use-api";
 import { cn } from "@/components/layout";
 import { 
   Check, Edit3, Trash2, Mail, Search, Sparkles, User, 
   Clock, AlertCircle, ArrowRight, ShieldAlert, CheckCircle2,
-  RefreshCcw, Info
+  RefreshCcw, Info, Brain
 } from "lucide-react";
+
+const MODEL_SHORT: Record<string, string> = { qwen: "Qwen", gemma: "Gemma" };
+const MODEL_COLOR: Record<string, string> = {
+  qwen: "bg-indigo-500/20 text-indigo-300 border-indigo-500/30",
+  gemma: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
+};
 
 export default function InboxPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [filterPriority, setFilterPriority] = useState<string>("");
   const { data: listData, isLoading: listLoading } = useEmails({ priority: filterPriority });
   const { mutate: seed, isPending: isSeeding } = useSeedData();
+  const { data: rlSettings } = useRLSettings();
+  const { mutate: setModel, isPending: isSettingModel } = useSetRLModel();
 
   // Auto-seed if empty
   useEffect(() => {
@@ -26,18 +34,43 @@ export default function InboxPage() {
     <div className="flex h-full w-full">
       {/* List Pane */}
       <div className="w-[400px] border-r border-white/5 flex flex-col bg-black/10 backdrop-blur-sm z-10 relative shadow-2xl">
-        <div className="h-16 px-4 flex items-center border-b border-white/5 shrink-0 justify-between">
-          <h2 className="font-display font-semibold text-white">Inbox</h2>
-          <select 
-            className="bg-transparent border border-white/10 rounded-lg text-xs px-2 py-1 text-white focus:outline-none focus:border-primary"
-            value={filterPriority}
-            onChange={(e) => setFilterPriority(e.target.value)}
-          >
-            <option value="" className="bg-background">All Priorities</option>
-            <option value="high" className="bg-background">High Priority</option>
-            <option value="medium" className="bg-background">Medium Priority</option>
-            <option value="low" className="bg-background">Low Priority</option>
-          </select>
+        <div className="px-4 pt-3 pb-2 border-b border-white/5 shrink-0">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="font-display font-semibold text-white">Inbox</h2>
+            <select 
+              className="bg-transparent border border-white/10 rounded-lg text-xs px-2 py-1 text-white focus:outline-none focus:border-primary"
+              value={filterPriority}
+              onChange={(e) => setFilterPriority(e.target.value)}
+            >
+              <option value="" className="bg-background">All Priorities</option>
+              <option value="high" className="bg-background">High Priority</option>
+              <option value="medium" className="bg-background">Medium Priority</option>
+              <option value="low" className="bg-background">Low Priority</option>
+            </select>
+          </div>
+          {rlSettings && (
+            <div className="flex items-center gap-2">
+              <Brain className="w-3.5 h-3.5 text-primary shrink-0" />
+              <span className="text-[10px] text-white/40">RL Model:</span>
+              <div className="flex gap-1">
+                {Object.entries(rlSettings.available_models || {}).map(([key]) => (
+                  <button
+                    key={key}
+                    disabled={isSettingModel}
+                    onClick={() => setModel(key)}
+                    className={cn(
+                      "text-[10px] px-2 py-0.5 rounded-full border font-medium transition-all",
+                      rlSettings.model_key === key
+                        ? MODEL_COLOR[key] || "bg-primary/20 text-primary border-primary/30"
+                        : "bg-white/5 text-white/40 border-white/10 hover:bg-white/10"
+                    )}
+                  >
+                    {MODEL_SHORT[key] || key}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto p-2 space-y-1">
@@ -74,6 +107,12 @@ export default function InboxPage() {
                 <Badge intent={email.intent} />
                 <Badge priority={email.priority} />
                 <Badge action={email.recommended_action} />
+                {email.rl_model_key && (
+                  <span className={cn("text-[9px] px-1.5 py-0.5 rounded-full border font-medium", MODEL_COLOR[email.rl_model_key] || "bg-white/10 text-white/50 border-white/10")}>
+                    <Brain className="w-2.5 h-2.5 inline-block mr-0.5 -mt-px" />
+                    {MODEL_SHORT[email.rl_model_key] || email.rl_model_key}
+                  </span>
+                )}
               </div>
             </button>
           ))}
@@ -154,10 +193,10 @@ function EmailDetail({ emailId }: { emailId: number }) {
         <div className="p-6 shrink-0 bg-primary/5 border-b border-primary/10">
           <div className="flex items-start space-x-3">
             <Sparkles className="w-5 h-5 text-primary mt-0.5" />
-            <div>
+            <div className="flex-1">
               <h4 className="text-sm font-semibold text-white mb-1">AI Analysis</h4>
               <p className="text-sm text-white/70 mb-3">{email.classification_notes}</p>
-              <div className="flex space-x-2">
+              <div className="flex flex-wrap gap-2">
                 <Badge priority={email.priority} />
                 <Badge intent={email.intent} />
                 <Badge action={email.recommended_action} />
@@ -165,6 +204,15 @@ function EmailDetail({ emailId }: { emailId: number }) {
                   <CheckCircle2 className="w-3 h-3 mr-1" />
                   {(email.classification_confidence * 100).toFixed(0)}% Match
                 </span>
+                {email.rl_model_key && (
+                  <span className={cn("px-2 py-1 rounded-full border text-[10px] font-medium flex items-center gap-1", MODEL_COLOR[email.rl_model_key] || "bg-white/5 text-white/50 border-white/10")}>
+                    <Brain className="w-3 h-3" />
+                    {MODEL_SHORT[email.rl_model_key] || email.rl_model_key}
+                    {(email.rl_positive_examples ?? 0) > 0 && (
+                      <span className="text-[9px] opacity-70">· {email.rl_positive_examples}+ examples</span>
+                    )}
+                  </span>
+                )}
               </div>
             </div>
           </div>

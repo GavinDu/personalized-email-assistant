@@ -5,6 +5,8 @@ from database import get_db
 from models import Email
 from schemas import EmailOut, EmailList
 from services.classifier import classify_email
+from services.rl_classifier import classify_with_rl
+from routers.rl import get_active_model_key
 from pydantic import BaseModel
 from datetime import datetime
 
@@ -19,13 +21,30 @@ class EmailCreateIn(BaseModel):
     received_at: Optional[datetime] = None
 
 
+def _apply_classification(email: Email, classification: dict):
+    email.priority = classification.get("priority", "medium")
+    email.intent = classification.get("intent", "unknown")
+    email.recommended_action = classification.get("recommended_action", "reply")
+    email.classification_confidence = classification.get("confidence", 0.5)
+    email.classification_notes = classification.get("notes", "")
+    email.rl_model = classification.get("rl_model")
+    email.rl_model_key = classification.get("rl_model_key")
+    email.rl_positive_examples = classification.get("rl_positive_examples", 0)
+    email.rl_negative_examples = classification.get("rl_negative_examples", 0)
+    email.rl_latency_ms = classification.get("rl_latency_ms")
+    email.rl_active = classification.get("rl_active", False)
+
+
 @router.post("/emails", response_model=EmailOut, status_code=201)
 def create_email(payload: EmailCreateIn, db: Session = Depends(get_db)):
-    classification = classify_email(
+    model_key = get_active_model_key()
+    classification = classify_with_rl(
         sender_name=payload.sender_name,
         sender_email=payload.sender_email,
         subject=payload.subject,
         body=payload.body,
+        db=db,
+        model_key=model_key,
     )
     email = Email(
         subject=payload.subject,
@@ -33,12 +52,8 @@ def create_email(payload: EmailCreateIn, db: Session = Depends(get_db)):
         sender_email=payload.sender_email,
         body=payload.body,
         received_at=payload.received_at or datetime.now(),
-        priority=classification.get("priority", "medium"),
-        intent=classification.get("intent", "unknown"),
-        recommended_action=classification.get("recommended_action", "reply"),
-        classification_confidence=classification.get("confidence", 0.5),
-        classification_notes=classification.get("notes", ""),
     )
+    _apply_classification(email, classification)
     db.add(email)
     db.commit()
     db.refresh(email)
@@ -51,17 +66,16 @@ def reclassify_email(email_id: int, db: Session = Depends(get_db)):
     if not email:
         raise HTTPException(status_code=404, detail="Email not found")
 
-    classification = classify_email(
+    model_key = get_active_model_key()
+    classification = classify_with_rl(
         sender_name=email.sender_name,
         sender_email=email.sender_email,
         subject=email.subject,
         body=email.body,
+        db=db,
+        model_key=model_key,
     )
-    email.priority = classification.get("priority", email.priority)
-    email.intent = classification.get("intent", email.intent)
-    email.recommended_action = classification.get("recommended_action", email.recommended_action)
-    email.classification_confidence = classification.get("confidence", email.classification_confidence)
-    email.classification_notes = classification.get("notes", email.classification_notes)
+    _apply_classification(email, classification)
 
     db.commit()
     db.refresh(email)
